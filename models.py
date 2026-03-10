@@ -179,3 +179,81 @@ class RecruitmentApproval(Base):
         Index("idx_applicant_id", "applicant_id"),
         Index("idx_department_id", "department_id"),
     )
+
+
+class Tag(Base):
+    """标签库表"""
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    type: Mapped[str] = mapped_column(SQLEnum('内置', '自定义', name='tag_type'), default='自定义')
+    scene: Mapped[Optional[dict]] = mapped_column(JSON)
+    rule_type: Mapped[Optional[list]] = mapped_column(JSON)
+    rule_detail: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(SQLEnum('启用', '禁用', name='tag_status'), default='启用')
+    parent_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('tags.id'))
+    usage_count: Mapped[int] = mapped_column(Integer, default=0)
+    activity_rate: Mapped[int] = mapped_column(Integer, default=0)
+    graph_type: Mapped[Optional[str]] = mapped_column(SQLEnum('节点', '关系', name='graph_type'))
+    relation_name: Mapped[Optional[str]] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_category", "category"),
+        Index("idx_type", "type"),
+        Index("idx_status", "status"),
+    )
+
+
+class TagRecord(Base):
+    """标签打标记录表"""
+    __tablename__ = "tag_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 员工信息（冗余存储，避免频繁JOIN）
+    employee_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    employee_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    department: Mapped[Optional[str]] = mapped_column(String(100))
+    position: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # 标签信息（冗余存储）
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey('tags.id', ondelete='CASCADE'), nullable=False)
+    tag_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    tag_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    tag_category: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # 打标信息
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default='manual')
+    source_detail: Mapped[Optional[str]] = mapped_column(Text)
+    tagged_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    tagged_by: Mapped[Optional[str]] = mapped_column(String(100))
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # 状态管理（软删除）
+    status: Mapped[str] = mapped_column(
+        SQLEnum('生效中', '已过期', '已移除', name='tag_record_status'),
+        default='生效中',
+        nullable=False
+    )
+    removed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    removed_by: Mapped[Optional[str]] = mapped_column(String(100))
+    remove_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+    # 时间戳
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_tr_employee_id", "employee_id"),
+        Index("idx_tr_tag_id", "tag_id"),
+        Index("idx_tr_status", "status"),
+        Index("idx_tr_source", "source"),
+        Index("idx_tr_tagged_at", "tagged_at"),
+        Index("idx_tr_composite", "employee_id", "tag_id", "status"),
+    )
