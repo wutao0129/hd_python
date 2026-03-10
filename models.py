@@ -139,32 +139,32 @@ class RecruitmentApproval(Base):
     """招聘审批单表"""
     __tablename__ = "recruitment_approvals"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # 申请人信息
-    applicant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    applicant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     applicant_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     # 部门信息
-    department_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    department_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    department_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    department_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     # 职位信息
     position_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    position_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    position_code: Mapped[Optional[str]] = mapped_column(String(50))
     recruit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     position_type: Mapped[str] = mapped_column(String(50), nullable=False)
     work_location: Mapped[str] = mapped_column(String(200), nullable=False)
-    position_level: Mapped[str] = mapped_column(String(50), nullable=False)
-    expected_onboard_date: Mapped[str] = mapped_column(String(20), nullable=False)
-    recruit_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    position_level: Mapped[Optional[str]] = mapped_column(String(50))
+    expected_onboard_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    recruit_reason: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # 审批状态
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
     reject_reason: Mapped[Optional[str]] = mapped_column(Text)
 
     # 审批人信息
-    approver_id: Mapped[Optional[int]] = mapped_column(Integer)
+    approver_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     approver_name: Mapped[Optional[str]] = mapped_column(String(100))
 
     # 时间戳
@@ -173,9 +173,137 @@ class RecruitmentApproval(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     __table_args__ = (
         Index("idx_status", "status"),
         Index("idx_applicant_id", "applicant_id"),
         Index("idx_department_id", "department_id"),
+    )
+
+
+class RecruitmentPosition(Base):
+    """招聘岗位表"""
+    __tablename__ = "recruitment_positions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    department: Mapped[str] = mapped_column(String(50), nullable=False)
+    salary_range: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    candidates: Mapped[int] = mapped_column(Integer, nullable=False)
+    responsibilities: Mapped[str] = mapped_column(Text, nullable=False)
+    location: Mapped[str] = mapped_column(String(100), nullable=False)
+    headcount: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    approval_id: Mapped[Optional[str]] = mapped_column(String(50))
+    published_channels: Mapped[Optional[dict]] = mapped_column(JSON)
+
+    __table_args__ = (
+        Index("idx_status", "status"),
+        Index("idx_department", "department"),
+    )
+
+
+class RecruitmentResume(Base):
+    """招聘简历表"""
+    __tablename__ = "recruitment_resumes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    school: Mapped[str] = mapped_column(String(100), nullable=False)
+    degree: Mapped[str] = mapped_column(String(20), nullable=False)
+    experience: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    applied_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    current_company: Mapped[str] = mapped_column(String(100), nullable=False)
+    skills: Mapped[dict] = mapped_column(JSON, nullable=False)
+    scores: Mapped[dict] = mapped_column(JSON, nullable=False)
+    applied_position: Mapped[str] = mapped_column(String(100), nullable=False)
+    department: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    __table_args__ = (
+        Index("idx_status", "status"),
+        Index("idx_applied_position", "applied_position"),
+    )
+
+
+class RecruitmentChannel(Base):
+    """招聘渠道表"""
+    __tablename__ = "recruitment_channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_status", "status"),
+        Index("idx_type", "type"),
+    )
+
+
+class RecruitmentInterview(Base):
+    """面试记录表"""
+    __tablename__ = "recruitment_interviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resume_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    candidate_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    position_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    position_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    interviewer: Mapped[str] = mapped_column(String(50), nullable=False)
+    interview_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    interview_method: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    feedback: Mapped[Optional[str]] = mapped_column(Text)
+    score: Mapped[Optional[int]] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_resume_id", "resume_id"),
+        Index("idx_position_id", "position_id"),
+        Index("idx_status", "status"),
+    )
+
+
+class RecruitmentOffer(Base):
+    """Offer表"""
+    __tablename__ = "recruitment_offers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resume_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    candidate_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    position_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    position_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    offer_salary: Mapped[str] = mapped_column(String(50), nullable=False)
+    offer_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    expected_onboard_date: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_resume_id", "resume_id"),
+        Index("idx_position_id", "position_id"),
+        Index("idx_status", "status"),
+    )
+
+
+class RecruitmentQuestionBank(Base):
+    """题库表"""
+    __tablename__ = "recruitment_question_bank"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
+    tags: Mapped[Optional[dict]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_type", "type"),
+        Index("idx_difficulty", "difficulty"),
     )

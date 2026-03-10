@@ -1,7 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import questionnaire, survey, export, upload, menu, role, recruitment_approval
+from routers import (
+    questionnaire,
+    survey,
+    export,
+    upload,
+    menu,
+    role,
+    recruitment_approval,
+    recruitment_position,
+    recruitment_resume,
+    recruitment_channel,
+    recruitment_interview,
+    recruitment_offer,
+    recruitment_dashboard,
+    recruitment_question_bank
+)
 from pathlib import Path
 
 app = FastAPI(title="问卷接口服务", version="1.0.0")
@@ -25,6 +40,13 @@ app.include_router(upload.router)
 app.include_router(menu.router)
 app.include_router(role.router)
 app.include_router(recruitment_approval.router)
+app.include_router(recruitment_position.router)
+app.include_router(recruitment_resume.router)
+app.include_router(recruitment_channel.router)
+app.include_router(recruitment_interview.router)
+app.include_router(recruitment_offer.router)
+app.include_router(recruitment_dashboard.router)
+app.include_router(recruitment_question_bank.router)
 
 
 @app.get("/health")
