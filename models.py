@@ -200,6 +200,8 @@ class Tag(Base):
     activity_rate: Mapped[int] = mapped_column(Integer, default=0)
     graph_type: Mapped[Optional[str]] = mapped_column(SQLEnum('节点', '关系', name='graph_type'))
     relation_name: Mapped[Optional[str]] = mapped_column(String(100))
+    similar_tags: Mapped[Optional[str]] = mapped_column(Text)
+    exclusive_tags: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -207,6 +209,27 @@ class Tag(Base):
         Index("idx_category", "category"),
         Index("idx_type", "type"),
         Index("idx_status", "status"),
+    )
+
+
+class TagRule(Base):
+    """标签计算规则表"""
+    __tablename__ = "tag_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey('tags.id', ondelete='CASCADE'), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    left_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
+    condition: Mapped[str] = mapped_column(String(200), nullable=False)
+    operator: Mapped[str] = mapped_column(String(20), nullable=False)
+    value: Mapped[str] = mapped_column(String(500), nullable=False)
+    right_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
+    logic: Mapped[Optional[str]] = mapped_column(String(10), default='')
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_tag_rules_tag_id", "tag_id"),
     )
 
 

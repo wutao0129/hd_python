@@ -18,6 +18,8 @@ class TagBase(BaseModel):
     activity_rate: Optional[int] = 0
     graph_type: Optional[str] = None
     relation_name: Optional[str] = None
+    similar_tags: Optional[str] = None
+    exclusive_tags: Optional[str] = None
 
 
 class TagCreate(TagBase):
@@ -39,6 +41,8 @@ class TagUpdate(BaseModel):
     activity_rate: Optional[int] = None
     graph_type: Optional[str] = None
     relation_name: Optional[str] = None
+    similar_tags: Optional[str] = None
+    exclusive_tags: Optional[str] = None
 
 
 class TagResponse(TagBase):
@@ -62,3 +66,61 @@ class TagStats(BaseModel):
     enabled: int
     disabled: int
     avg_activity: int
+
+
+# ==================== 知识图谱 Schema ====================
+
+class TagGraphNode(BaseModel):
+    id: int
+    name: str
+    category: str
+    usage_count: int = 0
+    level: int = 0
+    description: Optional[str] = None
+    graph_type: Optional[str] = None
+    relation_name: Optional[str] = None
+    parent_id: Optional[int] = None
+
+
+class TagGraphRelation(BaseModel):
+    source: int = Field(..., alias='from')
+    target: int = Field(..., alias='to')
+    type: str
+    strength: float = 1.0
+
+    class Config:
+        populate_by_name = True
+
+
+class TagGraphResponse(BaseModel):
+    nodes: List[TagGraphNode]
+    relations: List[TagGraphRelation]
+
+
+# ==================== 标签规则 Schema ====================
+
+class TagRuleItem(BaseModel):
+    id: Optional[int] = None
+    left_bracket: str = ''
+    condition: str
+    operator: str
+    value: str
+    right_bracket: str = ''
+    logic: str = ''
+
+class TagRuleSaveRequest(BaseModel):
+    rules: List[TagRuleItem]
+
+class TagRuleResponse(BaseModel):
+    id: int
+    tag_id: int
+    sort_order: int
+    left_bracket: str
+    condition: str
+    operator: str
+    value: str
+    right_bracket: str
+    logic: str
+
+    class Config:
+        from_attributes = True

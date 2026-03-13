@@ -6,8 +6,8 @@ from typing import Optional
 import io
 import csv
 from database import get_db
-from models import Tag, TagRecord
-from schemas.tag import TagCreate, TagUpdate, TagResponse, TagListResponse, TagStats
+from models import Tag, TagRecord, TagRule
+from schemas.tag import TagCreate, TagUpdate, TagResponse, TagListResponse, TagStats, TagGraphNode, TagGraphRelation, TagGraphResponse, TagRuleSaveRequest, TagRuleResponse
 
 router = APIRouter(prefix="/api/tags", tags=["标签库"])
 
@@ -120,6 +120,139 @@ async def get_tag_rule_types(db: Session = Depends(get_db)):
         if tag[0]:
             rule_types.update(tag[0])
     return {"rule_types": sorted(list(rule_types))}
+
+
+@router.get("/graph", response_model=TagGraphResponse)
+async def get_tag_graph(db: Session = Depends(get_db)):
+    """获取标签知识图谱数据（节点和关系）"""
+    # 查询所有启用的标签作为节点
+    tags = db.query(Tag).filter(Tag.status == '启用').all()
+
+    # 实时计算 usage_count
+    tag_ids = [tag.id for tag in tags]
+    if tag_ids:
+        usage_counts = dict(
+            db.query(TagRecord.tag_id, func.count(TagRecord.id))
+            .filter(TagRecord.tag_id.in_(tag_ids), TagRecord.status == '生效中')
+            .group_by(TagRecord.tag_id)
+            .all()
+        )
+        for tag in tags:
+            tag.usage_count = usage_counts.get(tag.id, 0)
+
+    # 计算节点层级（基于 parent_id）
+    def calculate_level(tag_id, parent_map, level_cache):
+        if tag_id in level_cache:
+            return level_cache[tag_id]
+        if tag_id not in parent_map or parent_map[tag_id] is None:
+            level_cache[tag_id] = 0
+            return 0
+        parent_level = calculate_level(parent_map[tag_id], parent_map, level_cache)
+        level_cache[tag_id] = parent_level + 1
+        return parent_level + 1
+
+    parent_map = {tag.id: tag.parent_id for tag in tags}
+    level_cache = {}
+
+    # 构建节点列表
+    nodes = []
+    for tag in tags:
+        level = calculate_level(tag.id, parent_map, level_cache)
+        nodes.append(TagGraphNode(
+            id=tag.id,
+            name=tag.name,
+            category=tag.category,
+            usage_count=tag.usage_count,
+            level=level,
+            description=tag.description,
+            graph_type=tag.graph_type,
+            relation_name=tag.relation_name,
+            parent_id=tag.parent_id
+        ))
+
+    # 构建关系列表
+    relations = []
+    name_to_id = {tag.name: tag.id for tag in tags}
+    existing_ids = set(tag.id for tag in tags)
+    virtual_id = -1
+
+    # 0. 分类包含关系：为每个分类创建虚拟节点，分类 → 标签
+    category_id_map = {}
+    categories = set(tag.category for tag in tags)
+    for cat in categories:
+        cat_id = virtual_id
+        category_id_map[cat] = cat_id
+        nodes.append(TagGraphNode(
+            id=cat_id, name=cat, category=cat,
+            usage_count=0, level=0, graph_type='分类'
+        ))
+        virtual_id -= 1
+
+    for tag in tags:
+        # 没有 parent_id 的标签，挂到分类节点下
+        if not tag.parent_id and tag.category in category_id_map:
+            relations.append(TagGraphRelation(
+                **{'from': category_id_map[tag.category], 'to': tag.id, 'type': '包含', 'strength': 0.8}
+            ))
+
+    # 0.5 场景包含关系：为每个场景创建虚拟节点，场景 → 标签
+    scene_id_map = {}
+    for tag in tags:
+        if tag.scene:
+            scenes = tag.scene if isinstance(tag.scene, list) else []
+            for scene_name in scenes:
+                if scene_name not in scene_id_map:
+                    scene_id_map[scene_name] = virtual_id
+                    nodes.append(TagGraphNode(
+                        id=virtual_id, name=scene_name, category='场景',
+                        usage_count=0, level=0, graph_type='场景'
+                    ))
+                    virtual_id -= 1
+                relations.append(TagGraphRelation(
+                    **{'from': scene_id_map[scene_name], 'to': tag.id, 'type': '包含', 'strength': 0.6}
+                ))
+
+    for tag in tags:
+        # 1. 包含关系（parent_id）
+        if tag.parent_id:
+            relations.append(TagGraphRelation(
+                **{'from': tag.parent_id, 'to': tag.id, 'type': '包含', 'strength': 1.0}
+            ))
+
+        # 2. 相似关系（similar_tags）
+        if tag.similar_tags:
+            for name in [n.strip() for n in tag.similar_tags.split(',') if n.strip()]:
+                target_id = name_to_id.get(name)
+                if target_id is None:
+                    # 虚拟节点
+                    target_id = virtual_id
+                    name_to_id[name] = virtual_id
+                    nodes.append(TagGraphNode(
+                        id=virtual_id, name=name, category='未知',
+                        usage_count=0, level=0
+                    ))
+                    virtual_id -= 1
+                relations.append(TagGraphRelation(
+                    **{'from': tag.id, 'to': target_id, 'type': '相似', 'strength': 0.6}
+                ))
+
+        # 3. 互斥关系（exclusive_tags）
+        if tag.exclusive_tags:
+            for name in [n.strip() for n in tag.exclusive_tags.split(',') if n.strip()]:
+                target_id = name_to_id.get(name)
+                if target_id is None:
+                    target_id = virtual_id
+                    name_to_id[name] = virtual_id
+                    nodes.append(TagGraphNode(
+                        id=virtual_id, name=name, category='未知',
+                        usage_count=0, level=0
+                    ))
+                    virtual_id -= 1
+                relations.append(TagGraphRelation(
+                    **{'from': tag.id, 'to': target_id, 'type': '互斥', 'strength': 0.8}
+                ))
+
+    return TagGraphResponse(nodes=nodes, relations=relations)
 
 
 @router.get("/export")
@@ -283,3 +416,46 @@ async def toggle_tag_status(tag_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_tag)
     return db_tag
+
+
+# ==================== 标签规则接口 ====================
+
+@router.get("/{tag_id}/rules")
+async def get_tag_rules(tag_id: int, db: Session = Depends(get_db)):
+    """获取标签的计算规则列表"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="标签不存在")
+
+    rules = db.query(TagRule).filter(TagRule.tag_id == tag_id).order_by(TagRule.sort_order).all()
+    return {"rules": rules}
+
+
+@router.post("/{tag_id}/rules")
+async def save_tag_rules(tag_id: int, request: TagRuleSaveRequest, db: Session = Depends(get_db)):
+    """保存标签的计算规则（全量替换）"""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="标签不存在")
+
+    # 删除旧规则
+    db.query(TagRule).filter(TagRule.tag_id == tag_id).delete()
+
+    # 插入新规则
+    for idx, rule in enumerate(request.rules):
+        db_rule = TagRule(
+            tag_id=tag_id,
+            sort_order=idx,
+            left_bracket=rule.left_bracket,
+            condition=rule.condition,
+            operator=rule.operator,
+            value=rule.value,
+            right_bracket=rule.right_bracket,
+            logic=rule.logic,
+        )
+        db.add(db_rule)
+
+    db.commit()
+
+    rules = db.query(TagRule).filter(TagRule.tag_id == tag_id).order_by(TagRule.sort_order).all()
+    return {"rules": rules}
