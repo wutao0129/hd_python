@@ -15,7 +15,10 @@ from routers import (
     recruitment_interview,
     recruitment_offer,
     recruitment_dashboard,
-    recruitment_question_bank
+    recruitment_question_bank,
+    competency_model,
+    matching,
+    rule_set
 )
 from pathlib import Path
 
@@ -47,6 +50,11 @@ app.include_router(recruitment_interview.router)
 app.include_router(recruitment_offer.router)
 app.include_router(recruitment_dashboard.router)
 app.include_router(recruitment_question_bank.router)
+app.include_router(competency_model.router)
+app.include_router(competency_model.indicator_router)
+app.include_router(competency_model.scoring_router)
+app.include_router(matching.router)
+app.include_router(rule_set.router)
 
 
 @app.get("/health")

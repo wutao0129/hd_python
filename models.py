@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func, ForeignKey, Boolean, Enum as SQLEnum, Index
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum as SQLEnum, ForeignKey, Index, Integer, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -307,3 +307,253 @@ class RecruitmentQuestionBank(Base):
         Index("idx_type", "type"),
         Index("idx_difficulty", "difficulty"),
     )
+
+
+# ============================================
+# 胜任力模型相关表 (Issue #72)
+# ============================================
+
+class CompetencyModel(Base):
+    """胜任力模型主表"""
+    __tablename__ = "competency_model"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    model_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    position_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    position_level: Mapped[str] = mapped_column(String(20), nullable=False)
+    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    industry: Mapped[str] = mapped_column(String(50), nullable=False)
+    version: Mapped[str] = mapped_column(String(10), nullable=False, default="V1.0")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    style: Mapped[Optional[str]] = mapped_column(String(200))
+    created_by: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_cm_status", "status"),
+        Index("idx_cm_industry", "industry"),
+    )
+
+
+class CompetencyModelCondition(Base):
+    """适用条件表"""
+    __tablename__ = "competency_model_condition"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(30), nullable=False)
+    values: Mapped[dict] = mapped_column("values", JSON, nullable=False)
+    logic: Mapped[str] = mapped_column(String(5), nullable=False, default="AND")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("idx_cmc_model", "model_id"),
+    )
+
+
+class CompetencyDimension(Base):
+    """能力维度表"""
+    __tablename__ = "competency_dimension"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    icon: Mapped[Optional[str]] = mapped_column(String(50))
+    color: Mapped[Optional[str]] = mapped_column(String(20))
+    weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=25.00)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("idx_cd_model", "model_id"),
+    )
+
+
+class CompetencyItem(Base):
+    """能力指标项表"""
+    __tablename__ = "competency_item"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    dimension_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("competency_dimension.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    level: Mapped[str] = mapped_column(String(20), nullable=False, default="熟练")
+    weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index("idx_ci_dimension", "dimension_id"),
+        Index("idx_ci_model", "model_id"),
+    )
+
+
+class ScoringScheme(Base):
+    """评分方案表"""
+    __tablename__ = "scoring_scheme"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    model_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    scale: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    level_dict_type: Mapped[str] = mapped_column(String(10), nullable=False, default="L1_L5")
+    peer_group_rule: Mapped[Optional[str]] = mapped_column(String(100))
+
+    __table_args__ = (
+        Index("idx_ss_model", "model_id"),
+    )
+
+
+class ScoringLevelMapping(Base):
+    """评分等级映射表"""
+    __tablename__ = "scoring_level_mapping"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    scheme_id: Mapped[str] = mapped_column(String(36), ForeignKey("scoring_scheme.id", ondelete="CASCADE"), nullable=False)
+    level: Mapped[str] = mapped_column(String(10), nullable=False)
+    label: Mapped[str] = mapped_column(String(50), nullable=False)
+    min_score: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    max_score: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+
+
+class BehaviorAnchor(Base):
+    """行为锚点表"""
+    __tablename__ = "behavior_anchor"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    item_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("competency_item.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"), nullable=False)
+    level: Mapped[str] = mapped_column(String(10), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    behavior_description: Mapped[str] = mapped_column(Text, nullable=False)
+    example: Mapped[Optional[str]] = mapped_column(Text)
+    min_score: Mapped[Optional[float]] = mapped_column(Numeric(8, 2))
+    max_score: Mapped[Optional[float]] = mapped_column(Numeric(8, 2))
+
+    __table_args__ = (
+        Index("idx_ba_item", "item_id"),
+        Index("idx_ba_model", "model_id"),
+    )
+
+
+class TagTriggerRule(Base):
+    """标签触发规则表"""
+    __tablename__ = "tag_trigger_rule"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("competency_model.id", ondelete="CASCADE"), nullable=False)
+    tag_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    tag_color: Mapped[str] = mapped_column(String(20), nullable=False, default="#1976D2")
+    tag_category: Mapped[str] = mapped_column(String(30), nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    logic: Mapped[str] = mapped_column(String(5), nullable=False, default="AND")
+    expire_days: Mapped[Optional[int]] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index("idx_ttr_model", "model_id"),
+    )
+
+
+class TagTriggerCondition(Base):
+    """标签触发条件表"""
+    __tablename__ = "tag_trigger_condition"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tag_trigger_rule.id", ondelete="CASCADE"), nullable=False)
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    target_id: Mapped[Optional[str]] = mapped_column(String(36))
+    target_name: Mapped[Optional[str]] = mapped_column(String(100))
+    operator: Mapped[str] = mapped_column(String(5), nullable=False, default=">=")
+    value: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class TagTriggerAction(Base):
+    """标签触发动作表"""
+    __tablename__ = "tag_trigger_action"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tag_trigger_rule.id", ondelete="CASCADE"), nullable=False)
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    config: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class RuleSet(Base):
+    """规则集表"""
+    __tablename__ = "rule_set"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    scenarios: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    score_formula: Mapped[str] = mapped_column(String(30), nullable=False, default="weighted_average")
+    pass_score: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    effective_type: Mapped[Optional[str]] = mapped_column(String(20))
+    effective_date: Mapped[Optional[date]] = mapped_column(Date)
+    version: Mapped[str] = mapped_column(String(10), nullable=False, default="V1.0")
+    remark: Mapped[Optional[str]] = mapped_column(Text)
+    created_by: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_rs_status", "status"),
+    )
+
+
+class DimensionWeightConfig(Base):
+    """维度权重配置表"""
+    __tablename__ = "dimension_weight_config"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_set_id: Mapped[str] = mapped_column(String(36), ForeignKey("rule_set.id", ondelete="CASCADE"), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(30), nullable=False)
+    dimension_label: Mapped[str] = mapped_column(String(50), nullable=False)
+    weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    min_pass_score: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    scoring_scheme: Mapped[Optional[str]] = mapped_column(String(30))
+    is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class IndicatorRuleConfig(Base):
+    """指标规则配置表"""
+    __tablename__ = "indicator_rule_config"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_set_id: Mapped[str] = mapped_column(String(36), ForeignKey("rule_set.id", ondelete="CASCADE"), nullable=False)
+    indicator_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    indicator_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(30), nullable=False)
+    weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    match_formula: Mapped[str] = mapped_column(String(30), nullable=False, default="level_match")
+    threshold_level: Mapped[str] = mapped_column(String(5), nullable=False, default="L3")
+    min_accept_level: Mapped[str] = mapped_column(String(5), nullable=False, default="L1")
+    deviation_penalty: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=5.00)
+    is_key_indicator: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class MatchResultLevel(Base):
+    """匹配结果等级表"""
+    __tablename__ = "match_result_level"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_set_id: Mapped[str] = mapped_column(String(36), ForeignKey("rule_set.id", ondelete="CASCADE"), nullable=False)
+    level: Mapped[str] = mapped_column(String(5), nullable=False)
+    label: Mapped[str] = mapped_column(String(50), nullable=False)
+    min_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    color: Mapped[str] = mapped_column(String(20), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class IndicatorLibrary(Base):
+    """指标库表"""
+    __tablename__ = "indicator_library"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    level: Mapped[str] = mapped_column(String(20), nullable=False, default="熟练")
+    is_preset: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
