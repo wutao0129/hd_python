@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func, ForeignKey, Boolean, Enum as SQLEnum, Index
+from decimal import Decimal
+from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func, ForeignKey, Boolean, Enum as SQLEnum, Index, CHAR, DECIMAL, Date, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -181,102 +182,211 @@ class RecruitmentApproval(Base):
     )
 
 
-class Tag(Base):
-    """标签库表"""
-    __tablename__ = "tags"
+# ==================== 员工表（只读，用于 JOIN） ====================
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    category: Mapped[str] = mapped_column(String(50), nullable=False)
-    type: Mapped[str] = mapped_column(SQLEnum('内置', '自定义', name='tag_type'), default='自定义')
+class SysEmp(Base):
+    """员工信息表（只读）"""
+    __tablename__ = "sys_emp"
+
+    emp_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    emp_code: Mapped[Optional[str]] = mapped_column(String(50))
+    emp_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    emp_status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    dept_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    dept_name: Mapped[Optional[str]] = mapped_column(String(100))
+    post_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    post_name: Mapped[Optional[str]] = mapped_column(String(100))
+    job_level: Mapped[Optional[str]] = mapped_column(String(10))
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(30))
+
+
+# ==================== 标签库主表 ====================
+
+class SysTag(Base):
+    """标签库表 (sys_tag)"""
+    __tablename__ = "sys_tag"
+
+    tag_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tag_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    tag_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    tag_category: Mapped[str] = mapped_column(String(50), nullable=False)
+    tag_type: Mapped[Optional[str]] = mapped_column(String(10), default='1')  # 0内置 1自定义
     scene: Mapped[Optional[dict]] = mapped_column(JSON)
     rule_type: Mapped[Optional[list]] = mapped_column(JSON)
     rule_detail: Mapped[Optional[str]] = mapped_column(Text)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(SQLEnum('启用', '禁用', name='tag_status'), default='启用')
-    parent_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('tags.id'))
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')  # 0草稿 1启用 2停用
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')  # 0存在 2删除
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
     activity_rate: Mapped[int] = mapped_column(Integer, default=0)
-    graph_type: Mapped[Optional[str]] = mapped_column(SQLEnum('节点', '关系', name='graph_type'))
+    graph_type: Mapped[Optional[str]] = mapped_column(String(10))
     relation_name: Mapped[Optional[str]] = mapped_column(String(100))
     similar_tags: Mapped[Optional[str]] = mapped_column(Text)
     exclusive_tags: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(30))
 
     __table_args__ = (
-        Index("idx_category", "category"),
-        Index("idx_type", "type"),
-        Index("idx_status", "status"),
+        Index("idx_sys_tag_tag_category", "tag_category"),
+        Index("idx_sys_tag_tag_type", "tag_type"),
+        Index("idx_sys_tag_status", "status"),
+        Index("idx_sys_tag_parent_id", "parent_id"),
+        Index("idx_sys_tag_tenant_id", "tenant_id"),
     )
 
 
-class TagRule(Base):
-    """标签计算规则表"""
-    __tablename__ = "tag_rules"
+# 别名，减少路由改动
+Tag = SysTag
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey('tags.id', ondelete='CASCADE'), nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-    left_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
-    condition: Mapped[str] = mapped_column(String(200), nullable=False)
-    operator: Mapped[str] = mapped_column(String(20), nullable=False)
-    value: Mapped[str] = mapped_column(String(500), nullable=False)
-    right_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
-    logic: Mapped[Optional[str]] = mapped_column(String(10), default='')
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+# ==================== 标签触发规则表 ====================
+
+class SysTagTriggerRule(Base):
+    """标签触发规则表"""
+    __tablename__ = "sys_tag_trigger_rule"
+
+    rule_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    tag_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    tag_color: Mapped[str] = mapped_column(String(20), nullable=False, default='#1976D2')
+    tag_category: Mapped[str] = mapped_column(String(30), nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    logic: Mapped[str] = mapped_column(String(5), nullable=False, default='AND')
+    expire_days: Mapped[Optional[int]] = mapped_column(Integer)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(20))
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     __table_args__ = (
-        Index("idx_tag_rules_tag_id", "tag_id"),
+        Index("idx_sys_tag_trigger_rule_model_id", "model_id"),
+        Index("idx_sys_tag_trigger_rule_tenant_id", "tenant_id"),
     )
 
 
-class TagRecord(Base):
-    """标签打标记录表"""
-    __tablename__ = "tag_records"
+class SysTagTriggerCondition(Base):
+    """标签触发条件表"""
+    __tablename__ = "sys_tag_trigger_condition"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-
-    # 员工信息（冗余存储，避免频繁JOIN）
-    employee_id: Mapped[str] = mapped_column(String(50), nullable=False)
-    employee_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    department: Mapped[Optional[str]] = mapped_column(String(100))
-    position: Mapped[Optional[str]] = mapped_column(String(100))
-
-    # 标签信息（冗余存储）
-    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey('tags.id', ondelete='CASCADE'), nullable=False)
-    tag_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    tag_code: Mapped[str] = mapped_column(String(100), nullable=False)
-    tag_category: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    # 打标信息
-    source: Mapped[str] = mapped_column(String(50), nullable=False, default='manual')
-    source_detail: Mapped[Optional[str]] = mapped_column(Text)
-    tagged_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
-    tagged_by: Mapped[Optional[str]] = mapped_column(String(100))
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
-    # 状态管理（软删除）
-    status: Mapped[str] = mapped_column(
-        SQLEnum('生效中', '已过期', '已移除', name='tag_record_status'),
-        default='生效中',
-        nullable=False
-    )
-    removed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    removed_by: Mapped[Optional[str]] = mapped_column(String(100))
-    remove_reason: Mapped[Optional[str]] = mapped_column(Text)
-
-    # 时间戳
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    condition_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    target_id: Mapped[Optional[str]] = mapped_column(String(36))
+    target_name: Mapped[Optional[str]] = mapped_column(String(100))
+    operator: Mapped[str] = mapped_column(String(5), nullable=False, default='>=')
+    value: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(20))
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     __table_args__ = (
-        Index("idx_tr_employee_id", "employee_id"),
-        Index("idx_tr_tag_id", "tag_id"),
-        Index("idx_tr_status", "status"),
-        Index("idx_tr_source", "source"),
-        Index("idx_tr_tagged_at", "tagged_at"),
-        Index("idx_tr_composite", "employee_id", "tag_id", "status"),
+        Index("idx_sys_tag_trigger_condition_rule_id", "rule_id"),
+        Index("idx_sys_tag_trigger_condition_tenant_id", "tenant_id"),
+    )
+
+
+class SysTagTriggerAction(Base):
+    """标签触发动作表"""
+    __tablename__ = "sys_tag_trigger_action"
+
+    action_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    type: Mapped[str] = mapped_column(String(30), nullable=False)
+    config: Mapped[Optional[str]] = mapped_column(Text)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(20))
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        Index("idx_sys_tag_trigger_action_rule_id", "rule_id"),
+        Index("idx_sys_tag_trigger_action_tenant_id", "tenant_id"),
+    )
+
+
+# ==================== 人才标签业务表 ====================
+
+class TalentTag(Base):
+    """人才关联标签表"""
+    __tablename__ = "talent_tag"
+
+    talent_tag_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    emp_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tag_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tag_source: Mapped[str] = mapped_column(String(10), nullable=False, default='manual')
+    score: Mapped[Optional[Decimal]] = mapped_column(DECIMAL(5, 2))
+    expire_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='1')  # 0草稿 1启用 2停用
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(20))
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("emp_id", "tag_id", name="uk_talent_tag_emp_tag"),
+        Index("idx_talent_tag_emp_id", "emp_id"),
+        Index("idx_talent_tag_tag_id", "tag_id"),
+        Index("idx_talent_tag_tag_source", "tag_source"),
+        Index("idx_talent_tag_tenant_id", "tenant_id"),
+    )
+
+
+# 别名
+TagRecord = TalentTag
+
+
+class TalentTagLog(Base):
+    """人才标签操作记录表"""
+    __tablename__ = "talent_tag_log"
+
+    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    emp_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tag_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)  # add/remove
+    action_source: Mapped[str] = mapped_column(String(10), nullable=False)  # auto/manual
+    action_reason: Mapped[Optional[str]] = mapped_column(String(500))
+    rule_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='1')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(20))
+    create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        Index("idx_talent_tag_log_emp_id", "emp_id"),
+        Index("idx_talent_tag_log_tag_id", "tag_id"),
+        Index("idx_talent_tag_log_action", "action"),
+        Index("idx_talent_tag_log_rule_id", "rule_id"),
+        Index("idx_talent_tag_log_tenant_id", "tenant_id"),
     )
