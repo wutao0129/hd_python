@@ -1,0 +1,30 @@
+INFO:     Will watch for changes in these directories: ['/Users/yee/hr-saas/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [42187] using WatchFiles
+INFO:     Started server process [42189]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:60760 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60762 - "GET /api/menus?lang=zh-CN HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60783 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60953 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61041 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55265 - "GET /api/tags?page=1&page_size=10&sort_by=update_time&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55266 - "GET /api/tags/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55267 - "GET /api/tags?page=1&page_size=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55297 - "GET /api/tag-records?page=1&page_size=20&sort_by=create_time&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55298 - "GET /api/tag-records/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55302 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55753 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55770 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58654 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58669 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59940 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59955 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63079 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63106 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62977 - "GET /api/menus?lang=zh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63022 - "GET /api/tags/graph HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63149 - "GET /api/tags?page=1&page_size=10&sort_by=update_time&sort_order=desc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63150 - "GET /api/tags?page=1&page_size=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "GET /api/tags/stats HTTP/1.1" 200 OK
