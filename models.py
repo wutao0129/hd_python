@@ -552,8 +552,29 @@ class IndicatorLibrary(Base):
     __tablename__ = "indicator_library"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(50), nullable=False)
+    weight: Mapped[int] = mapped_column(Integer, default=0)
     level: Mapped[str] = mapped_column(String(20), nullable=False, default="熟练")
     is_preset: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[int] = mapped_column(Integer, default=1)  # 1=启用 0=禁用
+    ref_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[Optional[str]] = mapped_column(String(100))
+    updated_by: Mapped[Optional[str]] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class HrIndicatorLibraryLog(Base):
+    """指标库操作日志表"""
+    __tablename__ = "hr_indicator_library_log"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    indicator_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    operation: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON)
+    operator: Mapped[Optional[str]] = mapped_column(String(100))
+    operated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -10,12 +10,10 @@ from models import (
     CompetencyModel, CompetencyModelCondition, CompetencyDimension,
     CompetencyItem, ScoringScheme, ScoringLevelMapping,
     BehaviorAnchor, TagTriggerRule, TagTriggerCondition, TagTriggerAction,
-    IndicatorLibrary,
 )
 from middleware import get_current_user
 
 router = APIRouter(prefix="/api/hr/competency-model", tags=["胜任力模型"])
-indicator_router = APIRouter(prefix="/api/hr/indicator-library", tags=["指标库"])
 scoring_router = APIRouter(prefix="/api/hr/scoring-scheme", tags=["评分方案"])
 
 
@@ -607,36 +605,6 @@ def copy_model(
     db.commit()
     db.refresh(new_obj)
     return {"code": 200, "message": "复制成功", "data": _build_detail(db, new_obj)}
-
-
-# ---------- 指标库接口 (Issue #74) ----------
-
-@indicator_router.get("")
-def get_indicator_library(
-    category: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    """查询指标库（支持按分类筛选）"""
-    query = db.query(IndicatorLibrary)
-    if category:
-        query = query.filter(IndicatorLibrary.category == category)
-
-    items = query.order_by(IndicatorLibrary.category, IndicatorLibrary.id).all()
-    return {
-        "code": 200, "message": "success",
-        "data": {
-            "total": len(items),
-            "items": [{
-                "id": item.id,
-                "name": item.name,
-                "description": item.description,
-                "category": item.category,
-                "level": item.level,
-                "isPreset": item.is_preset,
-            } for item in items],
-        },
-    }
 
 
 # ---------- 评分方案预置模板接口 (Issue #74) ----------

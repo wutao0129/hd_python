@@ -17,6 +17,7 @@ from routers import (
     recruitment_dashboard,
     recruitment_question_bank,
     competency_model,
+    indicator_library,
     matching,
     rule_set
 )
@@ -51,8 +52,8 @@ app.include_router(recruitment_offer.router)
 app.include_router(recruitment_dashboard.router)
 app.include_router(recruitment_question_bank.router)
 app.include_router(competency_model.router)
-app.include_router(competency_model.indicator_router)
 app.include_router(competency_model.scoring_router)
+app.include_router(indicator_library.router)
 app.include_router(matching.router)
 app.include_router(rule_set.router)
 

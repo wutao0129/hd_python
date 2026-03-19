@@ -126,9 +126,9 @@ def get_user_menus(
     transformed_menus = [transform_menu(menu) for menu in filtered_menus]
 
     return {
-        "code": 0,
+        "code": 200,
         "data": transformed_menus,
-        "message": "success"
+        "msg": "success"
     }
 
 
