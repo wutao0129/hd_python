@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from decimal import Decimal
-from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func, ForeignKey, Boolean, Enum as SQLEnum, Index, CHAR, DECIMAL, Date, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, Text, func, ForeignKey, Boolean, Enum as SQLEnum, Index, CHAR, DECIMAL, Date, UniqueConstraint, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
@@ -222,8 +222,9 @@ class SysTag(Base):
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
     activity_rate: Mapped[int] = mapped_column(Integer, default=0)
-    graph_type: Mapped[Optional[str]] = mapped_column(String(10))
-    relation_name: Mapped[Optional[str]] = mapped_column(String(100))
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    importance: Mapped[Optional[str]] = mapped_column(String(10), default='P2')
+    enable_schedule: Mapped[Optional[int]] = mapped_column(Integer, default=0, comment='是否开启定时任务自动刷新（0关闭 1开启，默认每天刷新）')
     similar_tags: Mapped[Optional[str]] = mapped_column(Text)
     exclusive_tags: Mapped[Optional[str]] = mapped_column(Text)
     create_dept: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -246,6 +247,68 @@ class SysTag(Base):
 Tag = SysTag
 
 
+# ==================== 标签关系表 ====================
+
+class SysTagRelation(Base):
+    """标签关系表 (sys_tag_relation)"""
+    __tablename__ = "sys_tag_relation"
+
+    relation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source_tag_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    target_tag_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    relation_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    relation_meta: Mapped[Optional[dict]] = mapped_column(JSON)
+    is_bidirectional: Mapped[int] = mapped_column(Integer, default=0)
+    relation_source: Mapped[Optional[str]] = mapped_column(String(10), default='manual')
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='1')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(30))
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("source_tag_id", "target_tag_id", "relation_type", name="uk_source_target_type"),
+        Index("idx_source_tag", "source_tag_id"),
+        Index("idx_target_tag", "target_tag_id"),
+        Index("idx_relation_type", "relation_type"),
+        Index("idx_relation_source", "relation_source"),
+        Index("idx_sys_tag_relation_tenant_id", "tenant_id"),
+    )
+
+
+# ==================== 标签场景关联表 ====================
+
+class SysTagScene(Base):
+    """标签场景关联表 (sys_tag_scene)"""
+    __tablename__ = "sys_tag_scene"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tag_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    scene_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    scene_name: Mapped[Optional[str]] = mapped_column(String(100))
+    relevance: Mapped[Optional[str]] = mapped_column(String(10), default='normal')
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='1')
+    del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
+    remark: Mapped[Optional[str]] = mapped_column(String(500))
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(30))
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    update_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint("tag_id", "scene_code", name="uk_tag_scene"),
+        Index("idx_sys_tag_scene_tag_id", "tag_id"),
+        Index("idx_sys_tag_scene_scene_code", "scene_code"),
+        Index("idx_sys_tag_scene_tenant_id", "tenant_id"),
+    )
+
+
 # ==================== 标签触发规则表 ====================
 
 class SysTagTriggerRule(Base):
@@ -253,12 +316,14 @@ class SysTagTriggerRule(Base):
     __tablename__ = "sys_tag_trigger_rule"
 
     rule_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tag_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     model_id: Mapped[str] = mapped_column(String(36), nullable=False)
     tag_name: Mapped[str] = mapped_column(String(50), nullable=False)
     tag_color: Mapped[str] = mapped_column(String(20), nullable=False, default='#1976D2')
     tag_category: Mapped[str] = mapped_column(String(30), nullable=False)
     rule_type: Mapped[str] = mapped_column(String(30), nullable=False)
     logic: Mapped[str] = mapped_column(String(5), nullable=False, default='AND')
+    remove_tags: Mapped[Optional[str]] = mapped_column(Text)
     expire_days: Mapped[Optional[int]] = mapped_column(Integer)
     status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
     del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
@@ -271,6 +336,7 @@ class SysTagTriggerRule(Base):
     update_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     __table_args__ = (
+        Index("idx_sys_tag_trigger_rule_tag_id", "tag_id"),
         Index("idx_sys_tag_trigger_rule_model_id", "model_id"),
         Index("idx_sys_tag_trigger_rule_tenant_id", "tenant_id"),
     )
@@ -282,11 +348,15 @@ class SysTagTriggerCondition(Base):
 
     condition_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     rule_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    left_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
     type: Mapped[str] = mapped_column(String(30), nullable=False)
     target_id: Mapped[Optional[str]] = mapped_column(String(36))
     target_name: Mapped[Optional[str]] = mapped_column(String(100))
-    operator: Mapped[str] = mapped_column(String(5), nullable=False, default='>=')
+    operator: Mapped[str] = mapped_column(String(20), nullable=False, default='>=')
     value: Mapped[str] = mapped_column(String(50), nullable=False)
+    right_bracket: Mapped[Optional[str]] = mapped_column(String(10), default='')
+    logic: Mapped[Optional[str]] = mapped_column(String(5), default='')
     status: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
     del_flag: Mapped[Optional[str]] = mapped_column(CHAR(1), default='0')
     remark: Mapped[Optional[str]] = mapped_column(String(500))
@@ -324,6 +394,27 @@ class SysTagTriggerAction(Base):
     __table_args__ = (
         Index("idx_sys_tag_trigger_action_rule_id", "rule_id"),
         Index("idx_sys_tag_trigger_action_tenant_id", "tenant_id"),
+    )
+
+
+class SysTagVersion(Base):
+    """标签规则版本历史表"""
+    __tablename__ = "sys_tag_version"
+
+    version_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    rule_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    rule_snapshot: Mapped[Optional[str]] = mapped_column(Text)
+    change_summary: Mapped[Optional[str]] = mapped_column(String(500))
+    effective_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    expire_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(30))
+    create_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    create_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    __table_args__ = (
+        Index("idx_sys_tag_version_rule_id", "rule_id"),
+        Index("idx_sys_tag_version_tenant_id", "tenant_id"),
     )
 
 

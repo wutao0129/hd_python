@@ -19,10 +19,11 @@ class TagBase(BaseModel):
     parent_id: Optional[int] = None
     usage_count: Optional[int] = 0
     activity_rate: Optional[int] = 0
-    graph_type: Optional[str] = None
-    relation_name: Optional[str] = None
     similar_tags: Optional[str] = None
     exclusive_tags: Optional[str] = None
+    priority: Optional[int] = 0
+    importance: Optional[str] = 'P2'
+    enable_schedule: Optional[int] = 0
 
 
 class TagCreate(TagBase):
@@ -43,10 +44,11 @@ class TagUpdate(BaseModel):
     parent_id: Optional[int] = None
     usage_count: Optional[int] = None
     activity_rate: Optional[int] = None
-    graph_type: Optional[str] = None
-    relation_name: Optional[str] = None
     similar_tags: Optional[str] = None
     exclusive_tags: Optional[str] = None
+    priority: Optional[int] = None
+    importance: Optional[str] = None
+    enable_schedule: Optional[int] = None
 
 
 class TagResponse(TagBase):
@@ -74,6 +76,60 @@ class TagStats(BaseModel):
     avg_activity: int
 
 
+# ==================== 标签关系 Schema ====================
+
+class TagRelationBase(BaseModel):
+    source_tag_id: int
+    target_tag_id: int
+    relation_type: str
+    relation_meta: Optional[dict] = None
+    is_bidirectional: int = 0
+    relation_source: str = 'manual'
+    sort_order: int = 0
+    status: str = '1'
+    remark: Optional[str] = None
+
+
+class TagRelationCreate(TagRelationBase):
+    pass
+
+
+class TagRelationResponse(TagRelationBase):
+    relation_id: int
+    del_flag: Optional[str] = '0'
+    create_time: Optional[datetime] = None
+    update_time: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== 标签场景 Schema ====================
+
+class TagSceneBase(BaseModel):
+    tag_id: int
+    scene_code: str
+    scene_name: Optional[str] = None
+    relevance: str = 'normal'
+    sort_order: int = 0
+    status: str = '1'
+    remark: Optional[str] = None
+
+
+class TagSceneCreate(TagSceneBase):
+    pass
+
+
+class TagSceneResponse(TagSceneBase):
+    id: int
+    del_flag: Optional[str] = '0'
+    create_time: Optional[datetime] = None
+    update_time: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== 知识图谱 Schema ====================
 
 class TagGraphNode(BaseModel):
@@ -83,8 +139,6 @@ class TagGraphNode(BaseModel):
     usage_count: int = 0
     level: int = 0
     description: Optional[str] = None
-    graph_type: Optional[str] = None
-    relation_name: Optional[str] = None
     parent_id: Optional[int] = None
 
 
